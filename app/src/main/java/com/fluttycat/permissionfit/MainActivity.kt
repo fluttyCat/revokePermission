@@ -13,6 +13,9 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.databinding.DataBindingUtil
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.fluttycat.permissionfit.databinding.ActivityMainBinding
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.GoogleApiClient
@@ -34,15 +37,25 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mGoogleApiClient: GoogleApiClient
 
+    private lateinit var binding: ActivityMainBinding
+
+    private var mutableList:ArrayList<String> = arrayListOf<String>()
+    private val logsAdapter: LogsAdapter by lazy {
+        LogsAdapter {
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        //setContentView(R.layout.activity_main)
+        binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
 
-        googleSignInPermission()
+       binding.subFit.setOnClickListener {
+           googleSignInPermission()
+        }
 
-        val unsubFit = findViewById<TextView>(R.id.unsubFit)
-        unsubFit.setOnClickListener {
+
+        binding.unsubFit.setOnClickListener {
             unsubscribeFitClient()
         }
     }
@@ -93,9 +106,14 @@ class MainActivity : AppCompatActivity() {
         Fitness.getRecordingClient(this, GoogleSignIn.getAccountForExtension(this, fitnessOptions))
             .subscribe(DataType.TYPE_STEP_COUNT_DELTA)
             .addOnSuccessListener {
+
+                mutableList.add("recordingFitClient success :$it")
+
                 Log.i("TAG", "Successfully subscribed!")
             }
             .addOnFailureListener { e ->
+                mutableList.add("recordingFitClient failure :${e.message}")
+
                 Log.w("TAG", "There was a problem subscribing.", e)
             }
 
@@ -124,9 +142,14 @@ class MainActivity : AppCompatActivity() {
             .unsubscribe(DataType.TYPE_STEP_COUNT_DELTA)
             .addOnSuccessListener {
                 Log.i("UNSUBSCRIBE", "Successfully unsubscribed.")
+
+                mutableList.add("UNSUBSCRIBE from fit success :$it")
+
                 disconnectFromGoogleFit()
             }
             .addOnFailureListener { e ->
+                mutableList.add("UNSUBSCRIBE from fit failure :${e.message}")
+
                 Log.w("UNSUBSCRIBE", "Failed to unsubscribe.")
             }
     }
@@ -136,6 +159,10 @@ class MainActivity : AppCompatActivity() {
             .disableFit()
             .addOnSuccessListener {
                 Log.i("DISCONNECT", "Disabled Google Fit")
+
+                mutableList.add( "DISCONNECT from fit success :$it")
+
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     this.revokeSelfPermissionOnKill(android.Manifest.permission.ACTIVITY_RECOGNITION)
                 }
@@ -144,6 +171,9 @@ class MainActivity : AppCompatActivity() {
 
             }
             .addOnFailureListener { e ->
+
+                mutableList.add("DISCONNECT from fit failure:${e.message}")
+
                 Log.w("DISCONNECT", "There was an error disabling Google Fit", e)
             }
 
@@ -172,8 +202,20 @@ class MainActivity : AppCompatActivity() {
             .addOnCompleteListener(this) {
                 if (it.isSuccessful) {
                     Toast.makeText(this, "access revoked.", Toast.LENGTH_LONG).show()
-                }else{
+                    mutableList.add( "revokeAccess :${it.exception}")
+                    mutableList.add( "revokeAccess :${it.isSuccessful}")
+                    mutableList.add( "revokeAccess :${it.result}")
+                    mutableList.add( "revokeAccess :${it.isComplete}")
+
+                } else {
+                    Toast.makeText(this, "${it.exception}", Toast.LENGTH_LONG).show()
                     Log.i("REVOKE", "${it.exception}")
+
+                    mutableList.add( "revokeAccess exception :${it.exception}")
+                    mutableList.add( "revokeAccess exception :${it.isSuccessful}")
+                    mutableList.add( "revokeAccess exception :${it.result}")
+                    mutableList.add( "revokeAccess exception :${it.isComplete}")
+
                 }
             }
 
@@ -181,14 +223,36 @@ class MainActivity : AppCompatActivity() {
 
         mGoogleSignInClient.signOut()
             .addOnCompleteListener(this) {
-                Toast.makeText(this, "signed out.", Toast.LENGTH_LONG).show()
+
+                if (it.isSuccessful) {
+                    mutableList.add("signed out success :${it.result}")
+                    mutableList.add("signed out success :${it.isSuccessful}")
+                    mutableList.add("signed out success :${it.isComplete}")
+                    Toast.makeText(this, "signed out.", Toast.LENGTH_LONG).show()
+                } else {
+                    mutableList.add( "signed out exception :${it.result}")
+                    mutableList.add( "signed out exception :${it.exception}")
+                    mutableList.add( "signed out exception :${it.isSuccessful}")
+
+                }
             }
 
+        initRecycler()
 
         /*Auth.GoogleSignInApi.signOut(mGoogleApiClient)
             .setResultCallback {
                 Toast.makeText(this, "signed out. status : $it", Toast.LENGTH_LONG).show()
             }*/
+    }
+
+    private fun initRecycler() {
+        binding.rv.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.VERTICAL, false)
+            adapter =
+                logsAdapter
+        }
+
+        logsAdapter.submitList(mutableList)
     }
 
     private fun revokeGoogleAccountAccess(context: Context) {
