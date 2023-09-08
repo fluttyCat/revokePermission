@@ -51,6 +51,9 @@ class LogsAdapter(private val itemClickCallback: (String) -> Unit) :
             binding.root.setOnClickListener {
                 itemClickCallback(value)
             }
+
+            binding.textview.text = value
+
         }
     }
 }
